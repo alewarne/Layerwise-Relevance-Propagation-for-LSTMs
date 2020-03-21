@@ -39,8 +39,8 @@ class LSTM_network:
         gate_h = tf.matmul(h, W_h)
         gate_pre = gate_x + gate_h + b
         gate_post = tf.concat([
-                            tf.sigmoid(gate_pre[:,self.idx_i]), tf.sigmoid(gate_pre[:, self.idx_f]),
-                            tf.tanh(gate_pre[:,self.idx_c]), tf.sigmoid(gate_pre[:, self.idx_o]),
+                            tf.sigmoid(gate_pre[:, self.idx_i]), tf.sigmoid(gate_pre[:, self.idx_f]),
+                            tf.tanh(gate_pre[:, self.idx_c]), tf.sigmoid(gate_pre[:, self.idx_o]),
                             ], axis=1)
         c.assign(gate_post[:, self.idx_f] * c + gate_post[:, self.idx_i] * gate_post[:, self.idx_c])
         h.assign(gate_post[:, self.idx_o] * tf.tanh(c))
@@ -55,12 +55,12 @@ class LSTM_network:
 
     @tf.function
     def forward_pass(self, x):
-        cond = lambda i, p: tf.less(i, tf.shape(x)[1])
-        output = (tf.zeros((self.batch_size, 4 * self.n_hidden), dtype=tf.float64),
+        # we have to reshape the input since tf.scans scans the input along the first axis
+        elems = tf.reshape(x, (tf.shape(x)[1], tf.shape(x)[0], tf.shape(x)[2]))
+        initializer = (tf.zeros((self.batch_size, 4 * self.n_hidden), dtype=tf.float64),
                   tf.zeros((self.batch_size, 4 * self.n_hidden), dtype=tf.float64),
                   tf.zeros((self.batch_size, self.n_hidden), dtype=tf.float64),
                   tf.zeros((self.batch_size, self.n_hidden), dtype=tf.float64))
-        loop_vars = (tf.constant(0), output)
-        body = lambda i, p: (tf.add(i, 1), self.one_step(x[:,i,:]))
-        o = tf.while_loop(cond, body, loop_vars)
-        return o[1]
+        fn = lambda a, x: self.one_step(x)
+        o = tf.scan(fn, elems, initializer=initializer)
+        return o
