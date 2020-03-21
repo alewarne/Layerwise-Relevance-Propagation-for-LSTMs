@@ -22,7 +22,7 @@ class LSTM_network:
 
         self.h_forward = tf.Variable(np.zeros((batch_size, n_hidden)))
         self.c_forward = tf.Variable(np.zeros((batch_size, n_hidden)))
-        self.h_forward = tf.Variable(np.zeros((batch_size, n_hidden)))
+        self.h_backward = tf.Variable(np.zeros((batch_size, n_hidden)))
         self.c_backward = tf.Variable(np.zeros((batch_size, n_hidden)))
 
         self.idx_i = slice(0, self.n_hidden)
@@ -30,17 +30,26 @@ class LSTM_network:
         self.idx_c = slice(2 * self.n_hidden, 3 * self.n_hidden)
         self.idx_o = slice(3 * self.n_hidden, 4 * self.n_hidden)
 
-    # input_arr is a numpy array of shape (batch_size, embedding_dim)
+    # input_arr x is a numpy array of shape (batch_size, embedding_dim)
     @tf.function
-    def forward(self, input_arr):
-        gate_forward_x = tf.matmul(input_arr, self.W_x_forward)
-        gate_forward_h = tf.matmul(self.h_forward, self.W_h_forward)
-        gate_forward_pre = gate_forward_x + gate_forward_h + self.b_forward
+    def cell_step(self, x, h, c, W_x, W_h, b):
+        # forward pass
+        gate_forward_x = tf.matmul(x, W_x)
+        gate_forward_h = tf.matmul(h, W_h)
+        gate_forward_pre = gate_forward_x + gate_forward_h + b
         print(gate_forward_pre.shape)
         gate_forward_post = tf.concat([
                             tf.sigmoid(gate_forward_pre[:,self.idx_i]), tf.sigmoid(gate_forward_pre[:, self.idx_f]),
                             tf.tanh(gate_forward_pre[:,self.idx_c]), tf.sigmoid(gate_forward_pre[:, self.idx_o]),
                             ], axis=1)
         print(gate_forward_post.shape)
-        self.c_forward.assign(gate_forward_post[:,self.idx_f] * self.c_forward + \
-                         gate_forward_post[:, self.idx_i] * gate_forward_post[:, self.idx_c])
+        c.assign(gate_forward_post[:, self.idx_f]*c + gate_forward_post[:, self.idx_i]*gate_forward_post[:, self.idx_c])
+        h.assign(gate_forward_post[:, self.idx_o] * tf.tanh(c))
+        return gate_forward_pre, gate_forward_post, c, h
+
+
+    @tf.function
+    def one_step(self, x):
+        forward = self.cell_step(x, self.h_forward, self.c_forward, self.W_x_forward, self.W_h_forward, self.b_forward)
+        backward = self.cell_step(x, self.h_backward, self.c_backward, self.W_x_backward, self.W_h_backward, self.b_backward)
+        return forward, backward
