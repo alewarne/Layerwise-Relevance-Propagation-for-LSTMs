@@ -19,12 +19,15 @@ class LSTM_network:
         self.W_h_bward = tf.constant(np.random.randn(self.n_hidden, 4 * self.n_hidden))
         self.b_bward = tf.constant(np.random.randn(4 * self.n_hidden, ))
 
-        self.W_dense = tf.constant(np.random.randn(n_hidden, n_classes))
+        self.W_dense_fw = tf.constant(np.random.randn(n_hidden, n_classes))
+        self.W_dense_bw = tf.constant(np.random.randn(n_hidden, n_classes))
 
         self.h_fward = tf.Variable(np.zeros((self.batch_size, n_hidden)))
         self.c_fward = tf.Variable(np.zeros((self.batch_size, n_hidden)))
         self.h_bward = tf.Variable(np.zeros((self.batch_size, n_hidden)))
         self.c_bward = tf.Variable(np.zeros((self.batch_size, n_hidden)))
+
+        self.output = tf.Variable(np.zeros((self.batch_size, n_classes)))
 
         self.idx_i = slice(0, self.n_hidden)
         self.idx_f = slice(self.n_hidden, 2 * self.n_hidden)
@@ -72,4 +75,8 @@ class LSTM_network:
         # outputs contain tesnors with (T, gates_pre, gates_post, c,h)
         o_fward = tf.scan(fn_fward, elems, initializer=initializer)
         o_bward = tf.scan(fn_bward, elems, initializer=initializer, reverse=True)
+        # final prediction scores
+        y_fward = tf.matmul(self.h_fward, self.W_dense_fw)
+        y_bward = tf.matmul(self.h_bward, self.W_dense_bw)
+        self.output.assign(y_fward + y_bward)
         return o_fward, o_bward
