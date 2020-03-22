@@ -1,7 +1,6 @@
 import tensorflow as tf
 import numpy as np
 
-
 # currently 1 bi-directional lstm layer followed by a dense layer
 class LSTM_network:
 
@@ -27,7 +26,7 @@ class LSTM_network:
         self.h_bward = tf.Variable(np.zeros((self.batch_size, n_hidden)))
         self.c_bward = tf.Variable(np.zeros((self.batch_size, n_hidden)))
 
-        self.output = tf.Variable(np.zeros((self.batch_size, n_classes)))
+        self.y_hat = tf.Variable(np.zeros((self.batch_size, n_classes)))
 
         self.idx_i = slice(0, self.n_hidden)
         self.idx_f = slice(self.n_hidden, 2 * self.n_hidden)
@@ -66,10 +65,10 @@ class LSTM_network:
     def full_pass(self, x):
         # we have to reshape the input since tf.scans scans the input along the first axis
         elems = tf.reshape(x, (tf.shape(x)[1], tf.shape(x)[0], tf.shape(x)[2]))
-        initializer = (tf.zeros((self.batch_size, 4 * self.n_hidden), dtype=tf.float64),
-                  tf.zeros((self.batch_size, 4 * self.n_hidden), dtype=tf.float64),
-                  tf.zeros((self.batch_size, self.n_hidden), dtype=tf.float64),
-                  tf.zeros((self.batch_size, self.n_hidden), dtype=tf.float64))
+        initializer = (tf.constant(np.zeros((self.batch_size, 4 * self.n_hidden))),
+                  tf.constant(np.zeros((self.batch_size, 4 * self.n_hidden))),
+                  tf.constant(np.zeros((self.batch_size, self.n_hidden))),
+                  tf.constant(np.zeros((self.batch_size, self.n_hidden))))
         fn_fward = lambda a, x: self.one_step_fward(x)
         fn_bward = lambda a, x: self.one_step_bward(x)
         # outputs contain tesnors with (T, gates_pre, gates_post, c,h)
@@ -78,11 +77,11 @@ class LSTM_network:
         # final prediction scores
         y_fward = tf.matmul(self.h_fward, self.W_dense_fw)
         y_bward = tf.matmul(self.h_bward, self.W_dense_bw)
-        self.output.assign(y_fward + y_bward)
+        self.y_hat.assign(y_fward + y_bward)
         return o_fward, o_bward
 
     @tf.function
-    def lrp_linear_layer(self, h_in, w, b, hout, Rout, bias_nb_units, eps, bias_factor=tf.constant(0.0, dtype=tf.float64)):
+    def lrp_linear_layer(self, h_in, w, b, hout, Rout, bias_nb_units, eps, bias_factor=0.0):
         """
         LRP for a linear layer with input dim D and output dim M.
         Args:
@@ -100,12 +99,31 @@ class LSTM_network:
         Returns:
         - Rin:            relevance at layer input, of shape (batch_size, D)
         """
+        bias_factor_t = tf.constant(bias_factor, dtype=tf.float64)
+        eps_t = tf.constant(eps, dtype=tf.float64)
         sign_out = tf.where(hout >= 0, 1., -1.)   # shape (batch_size, M)
         sign_out = tf.cast(sign_out, tf.float64)
         numerator_1 = tf.expand_dims(h_in, axis=2) * w
-        numerator_2 = (bias_factor * (tf.expand_dims(b, 0) + eps * sign_out) / bias_nb_units)
+        numerator_2 = (bias_factor_t * (tf.expand_dims(b, 0) + eps_t * sign_out) / bias_nb_units)
         numerator = numerator_1 + tf.expand_dims(numerator_2, 1)
         denom = hout + (eps*sign_out)
         message = numerator / tf.expand_dims(denom, 1) * tf.expand_dims(Rout, 1)
         R_in = tf.reduce_sum(message, axis=2)
         return R_in
+
+    @tf.function
+    def lrp(self, x, y=None, eps=1e-3, bias_factor=0.0):
+        """
+        LRP for a linear layer with input dim D and output dim M.
+        Args:
+        - x:              input array. dim = (batch_size, T, embedding_dim)
+        - y:              desired output_class to explain. dim = (batch_size,)
+        - eps:            eps value for lrp-eps
+        - bias_factor:    bias factor for lrp
+        Returns:
+        - Relevances:     relevances of each input dimension. dim = (batch_size, T, embedding_dim
+        """
+        output_fw, output_bw = self.full_pass(x)
+        print(self.y_hat)
+
+
