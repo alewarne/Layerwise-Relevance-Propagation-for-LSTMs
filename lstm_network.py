@@ -11,30 +11,30 @@ class LSTM_network:
         self.n_classes = n_classes
         self.batch_size = batch_size
 
-        self.W_x_forward = tf.constant(np.random.randn(self.embedding_dim, 4 * self.n_hidden))
-        self.W_h_forward = tf.constant(np.random.randn(self.n_hidden, 4 * self.n_hidden))
-        self.b_forward = tf.constant(np.random.randn(4*self.n_hidden,))
+        self.W_x_fward = tf.constant(np.random.randn(self.embedding_dim, 4 * self.n_hidden))
+        self.W_h_fward = tf.constant(np.random.randn(self.n_hidden, 4 * self.n_hidden))
+        self.b_fward = tf.constant(np.random.randn(4*self.n_hidden,))
 
-        self.W_x_backward = tf.constant(np.random.randn(self.embedding_dim, 4 * self.n_hidden))
-        self.W_h_backward = tf.constant(np.random.randn(self.n_hidden, 4 * self.n_hidden))
-        self.b_backward = tf.constant(np.random.randn(4 * self.n_hidden, ))
+        self.W_x_bward = tf.constant(np.random.randn(self.embedding_dim, 4 * self.n_hidden))
+        self.W_h_bward = tf.constant(np.random.randn(self.n_hidden, 4 * self.n_hidden))
+        self.b_bward = tf.constant(np.random.randn(4 * self.n_hidden, ))
 
         self.W_dense = tf.constant(np.random.randn(n_hidden, n_classes))
 
-        self.h_forward = tf.Variable(np.zeros((self.batch_size, n_hidden)))
-        self.c_forward = tf.Variable(np.zeros((self.batch_size, n_hidden)))
-        self.h_backward = tf.Variable(np.zeros((self.batch_size, n_hidden)))
-        self.c_backward = tf.Variable(np.zeros((self.batch_size, n_hidden)))
+        self.h_fward = tf.Variable(np.zeros((self.batch_size, n_hidden)))
+        self.c_fward = tf.Variable(np.zeros((self.batch_size, n_hidden)))
+        self.h_bward = tf.Variable(np.zeros((self.batch_size, n_hidden)))
+        self.c_bward = tf.Variable(np.zeros((self.batch_size, n_hidden)))
 
         self.idx_i = slice(0, self.n_hidden)
         self.idx_f = slice(self.n_hidden, 2 * self.n_hidden)
         self.idx_c = slice(2 * self.n_hidden, 3 * self.n_hidden)
         self.idx_o = slice(3 * self.n_hidden, 4 * self.n_hidden)
 
-    # input_arr x is a numpy array of shape (batch_size, embedding_dim)
+    # x is batch of embedding vectors (batch_size, embedding_dim)
     @tf.function
     def cell_step(self, x, h, c, W_x, W_h, b):
-        # forward pass
+        # fward pass
         gate_x = tf.matmul(x, W_x)
         gate_h = tf.matmul(h, W_h)
         gate_pre = gate_x + gate_h + b
@@ -46,21 +46,30 @@ class LSTM_network:
         h.assign(gate_post[:, self.idx_o] * tf.tanh(c))
         return gate_pre, gate_post, c, h
 
-
+    # x is batch of embedding vectors (batch_size, embedding_dim)
     @tf.function
-    def one_step(self, x):#, x_rev):
-        forward = self.cell_step(x, self.h_forward, self.c_forward, self.W_x_forward, self.W_h_forward, self.b_forward)
-        #backward = self.cell_step(x_rev, self.h_backward, self.c_backward, self.W_x_backward, self.W_h_backward, self.b_backward)
-        return forward#, backward
+    def one_step_fward(self, x):
+        fward = self.cell_step(x, self.h_fward, self.c_fward, self.W_x_fward, self.W_h_fward, self.b_fward)
+        return fward
 
+    # x_rev is batch of embedding vectors (batch_size, embedding_dim)
     @tf.function
-    def forward_pass(self, x):
+    def one_step_bward(self, x_rev):
+        bward = self.cell_step(x_rev, self.h_bward, self.c_bward, self.W_x_bward, self.W_h_bward, self.b_bward)
+        return bward
+
+    # input is full batch (batch_size, T, embedding_dim)
+    @tf.function
+    def full_pass(self, x):
         # we have to reshape the input since tf.scans scans the input along the first axis
         elems = tf.reshape(x, (tf.shape(x)[1], tf.shape(x)[0], tf.shape(x)[2]))
         initializer = (tf.zeros((self.batch_size, 4 * self.n_hidden), dtype=tf.float64),
                   tf.zeros((self.batch_size, 4 * self.n_hidden), dtype=tf.float64),
                   tf.zeros((self.batch_size, self.n_hidden), dtype=tf.float64),
                   tf.zeros((self.batch_size, self.n_hidden), dtype=tf.float64))
-        fn = lambda a, x: self.one_step(x)
-        o = tf.scan(fn, elems, initializer=initializer)
-        return o
+        fn_fward = lambda a, x: self.one_step_fward(x)
+        fn_bward = lambda a, x: self.one_step_bward(x)
+        # outputs contain tesnors with (T, gates_pre, gates_post, c,h)
+        o_fward = tf.scan(fn_fward, elems, initializer=initializer)
+        o_bward = tf.scan(fn_bward, elems, initializer=initializer, reverse=True)
+        return o_fward, o_bward
