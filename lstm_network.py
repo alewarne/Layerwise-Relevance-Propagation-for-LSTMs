@@ -80,3 +80,32 @@ class LSTM_network:
         y_bward = tf.matmul(self.h_bward, self.W_dense_bw)
         self.output.assign(y_fward + y_bward)
         return o_fward, o_bward
+
+    @tf.function
+    def lrp_linear_layer(self, h_in, w, b, hout, Rout, bias_nb_units, eps, bias_factor=tf.constant(0.0, dtype=tf.float64)):
+        """
+        LRP for a linear layer with input dim D and output dim M.
+        Args:
+        - hin:            forward pass input, of shape (batch_size, D)
+        - w:              connection weights, of shape (D, M)
+        - b:              biases, of shape (M,)
+        - hout:           forward pass output, of shape (batch_size, M) (unequal to np.dot(w.T,hin)+b if more than
+                          one incoming layer!)
+        - Rout:           relevance at layer output, of shape (batch_size, M)
+        - bias_nb_units:  total number of connected lower-layer units (onto which the bias/stabilizer contribution
+                          is redistributed for sanity check)
+        - eps:            stabilizer (small positive number)
+        - bias_factor:    set to 1.0 to check global relevance conservation, otherwise use 0.0 to ignore
+                          bias/stabilizer redistribution (recommended)
+        Returns:
+        - Rin:            relevance at layer input, of shape (batch_size, D)
+        """
+        sign_out = tf.where(hout >= 0, 1., -1.)   # shape (batch_size, M)
+        sign_out = tf.cast(sign_out, tf.float64)
+        numerator_1 = tf.expand_dims(h_in, axis=2) * w
+        numerator_2 = (bias_factor * (tf.expand_dims(b, 0) + eps * sign_out) / bias_nb_units)
+        numerator = numerator_1 + tf.expand_dims(numerator_2, 1)
+        denom = hout + (eps*sign_out)
+        message = numerator / tf.expand_dims(denom, 1) * tf.expand_dims(Rout, 1)
+        R_in = tf.reduce_sum(message, axis=2)
+        return R_in
