@@ -147,7 +147,7 @@ class LSTM_network:
                                        self.y_hat, R_T, 2 * self.n_hidden, eps, bias_factor)
         # Rh_bw_T = self.lrp_linear_layer(h_bw[self.T - 1], self.W_dense_bw, tf.constant(np.zeros(self.n_classes)),
         #                                self.y_hat, R_T, 2 * self.n_hidden, eps, bias_factor)
-        elems = np.arange(self.T, 0, -1)
+        elems = np.arange(self.T-1, -1, -1)
         initializer = (
                        Rh_fw_T,                # R_h_fw
                        Rh_fw_T,                # R_c_fw
@@ -157,8 +157,8 @@ class LSTM_network:
                        # tf.constant(np.zersos(x.shape))      # R_x_fw
                        )
 
-        t = 0
-        input_tuple = initializer
+        # t = 0
+        # input_tuple = initializer
         @tf.function
         def update(input_tuple, t):
             # t starts with T-1 ; the values we want to update are essentially Rh, Rc and Rx
