@@ -10,6 +10,7 @@ class LSTM_network:
         self.n_classes = n_classes
         self.batch_size = batch_size
 
+        # model parameters
         self.W_x_fward = tf.constant(np.random.randn(self.embedding_dim, 4 * self.n_hidden))
         self.W_h_fward = tf.constant(np.random.randn(self.n_hidden, 4 * self.n_hidden))
         self.b_fward = tf.constant(np.random.randn(4*self.n_hidden,))
@@ -21,13 +22,16 @@ class LSTM_network:
         self.W_dense_fw = tf.constant(np.random.randn(n_hidden, n_classes))
         self.W_dense_bw = tf.constant(np.random.randn(n_hidden, n_classes))
 
+        # the intermediate states we have to remember in order to use LRP
         self.h_fward = tf.Variable(np.zeros((self.batch_size, n_hidden)))
         self.c_fward = tf.Variable(np.zeros((self.batch_size, n_hidden)))
         self.h_bward = tf.Variable(np.zeros((self.batch_size, n_hidden)))
         self.c_bward = tf.Variable(np.zeros((self.batch_size, n_hidden)))
 
+        # prediction of the net
         self.y_hat = tf.Variable(np.zeros((self.batch_size, n_classes)))
 
+        # the following order is from keras. You might have to adjust it if you use different frameworks
         self.idx_i = slice(0, self.n_hidden)
         self.idx_f = slice(self.n_hidden, 2 * self.n_hidden)
         self.idx_c = slice(2 * self.n_hidden, 3 * self.n_hidden)
