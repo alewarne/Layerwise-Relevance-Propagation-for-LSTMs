@@ -88,7 +88,7 @@ class LSTM_network:
     @tf.function
     def full_pass(self, x):
         # we have to reshape the input since tf.scans scans the input along the first axis
-        elems = tf.reshape(x, (x.shape[1], x.shape[0], x.shape[2]))
+        elems = tf.transpose(x, perm=[1,0,2])
         initializer = (tf.constant(np.zeros((self.batch_size, 4 * self.n_hidden))),  # gates_pre
                        tf.constant(np.zeros((self.batch_size, 4 * self.n_hidden))),  # gates_post
                        tf.constant(np.zeros((self.batch_size, self.n_hidden))),      # c_t

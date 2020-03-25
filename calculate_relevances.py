@@ -23,9 +23,7 @@ def test_equality():
     net.full_pass(input_tf)
     model_output = orig_model.predict(input_keras)
     net_output = net.y_hat
-    print(model_output)
-    print(net_output.numpy())
-    return np.allclose(net_output.numpy(), model_output, atol=1e-2)
+    return np.allclose(net_output.numpy(), model_output, atol=1e-7)
 
 
 def test_time():
@@ -41,12 +39,12 @@ def test_time():
 
 
 if __name__ == '__main__':
-    n_samples = 100
+    n_samples = 2500
     T = 50
     n_hidden = 300
     n_embedding = 200
     n_classes = 2
-    batch_size = 1
+    batch_size = 25
     eps = 1e-3
     #path_to_model = '../LRPForSecurity/NetworkTraining/VulDeePecker/models/keras_model_wo_metrics_w_softmax.hdf5'
     if test_equality():
