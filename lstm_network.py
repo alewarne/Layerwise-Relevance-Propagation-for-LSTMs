@@ -59,29 +59,29 @@ class LSTM_network:
 
     # x is batch of embedding vectors (batch_size, embedding_dim)
     @tf.function
-    def cell_step(self, x, h, c, W_x, W_h, b):
+    def cell_step(self, x, h_old, c_old, W_x, W_h, b):
         # fward pass
         gate_x = tf.matmul(x, W_x)
-        gate_h = tf.matmul(h, W_h)
+        gate_h = tf.matmul(h_old, W_h)
         gate_pre = gate_x + gate_h + b
         gate_post = tf.concat([
                             tf.sigmoid(gate_pre[:, self.idx_i]), tf.sigmoid(gate_pre[:, self.idx_f]),
                             tf.tanh(gate_pre[:, self.idx_c]), tf.sigmoid(gate_pre[:, self.idx_o]),
                             ], axis=1)
-        c.assign(gate_post[:, self.idx_f] * c + gate_post[:, self.idx_i] * gate_post[:, self.idx_c])
-        h.assign(gate_post[:, self.idx_o] * tf.tanh(c))
-        return gate_pre, gate_post, c, h
+        c_new = gate_post[:, self.idx_f] * c_old + gate_post[:, self.idx_i] * gate_post[:, self.idx_c]
+        h_new = gate_post[:, self.idx_o] * tf.tanh(c_old)
+        return gate_pre, gate_post, c_new, h_new
 
     # x is batch of embedding vectors (batch_size, embedding_dim)
     @tf.function
-    def one_step_fward(self, x):
-        fward = self.cell_step(x, self.h_fward, self.c_fward, self.W_x_fward, self.W_h_fward, self.b_fward)
+    def one_step_fward(self, x, h_old_fw, c_old_fw):
+        fward = self.cell_step(x, h_old_fw, c_old_fw, self.W_x_fward, self.W_h_fward, self.b_fward)
         return fward
 
     # x_rev is batch of embedding vectors (batch_size, embedding_dim)
     @tf.function
-    def one_step_bward(self, x_rev):
-        bward = self.cell_step(x_rev, self.h_bward, self.c_bward, self.W_x_bward, self.W_h_bward, self.b_bward)
+    def one_step_bward(self, x_rev, h_old_bw, c_old_bw):
+        bward = self.cell_step(x_rev, h_old_bw, c_old_bw, self.W_x_bward, self.W_h_bward, self.b_bward)
         return bward
 
     # input is full batch (batch_size, T, embedding_dim)
@@ -89,15 +89,20 @@ class LSTM_network:
     def full_pass(self, x):
         # we have to reshape the input since tf.scans scans the input along the first axis
         elems = tf.reshape(x, (x.shape[1], x.shape[0], x.shape[2]))
-        initializer = (tf.constant(np.zeros((self.batch_size, 4 * self.n_hidden))),
-                       tf.constant(np.zeros((self.batch_size, 4 * self.n_hidden))),
-                       tf.constant(np.zeros((self.batch_size, self.n_hidden))),
-                       tf.constant(np.zeros((self.batch_size, self.n_hidden))))
-        fn_fward = lambda a, x: self.one_step_fward(x)
-        fn_bward = lambda a, x: self.one_step_bward(x)
+        initializer = (tf.constant(np.zeros((self.batch_size, 4 * self.n_hidden))),  # gates_pre
+                       tf.constant(np.zeros((self.batch_size, 4 * self.n_hidden))),  # gates_post
+                       tf.constant(np.zeros((self.batch_size, self.n_hidden))),      # c_t
+                       tf.constant(np.zeros((self.batch_size, self.n_hidden))))      # h_t
+        fn_fward = lambda a, x: self.one_step_fward(x, a[3], a[2])
+        fn_bward = lambda a, x: self.one_step_bward(x, a[3], a[2])
         # outputs contain tesnors with (T, gates_pre, gates_post, c,h)
         o_fward = tf.scan(fn_fward, elems, initializer=initializer)
         o_bward = tf.scan(fn_bward, elems, initializer=initializer, reverse=True)
+        # update cell state and h
+        self.c_fward.assign(o_fward[2][-1])
+        self.h_fward.assign(o_fward[3][-1])
+        self.c_bward.assign(o_fward[2][-1])
+        self.h_bward.assign(o_fward[3][-1])
         # final prediction scores
         y_fward = tf.matmul(self.h_fward, self.W_dense_fw)
         y_bward = tf.matmul(self.h_bward, self.W_dense_bw)
