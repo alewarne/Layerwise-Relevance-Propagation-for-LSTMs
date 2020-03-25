@@ -1,26 +1,40 @@
 import tensorflow as tf
 import numpy as np
 
+
 # currently 1 bi-directional lstm layer followed by a dense layer
 class LSTM_network:
 
-    def __init__(self, n_hidden, embedding_dim, n_classes, batch_size):
+    def __init__(self, n_hidden, embedding_dim, n_classes, batch_size, weights=None):
         self.n_hidden = n_hidden
         self.embedding_dim = embedding_dim
         self.n_classes = n_classes
         self.batch_size = batch_size
 
         # model parameters
-        self.W_x_fward = tf.constant(np.random.randn(self.embedding_dim, 4 * self.n_hidden))
-        self.W_h_fward = tf.constant(np.random.randn(self.n_hidden, 4 * self.n_hidden))
-        self.b_fward = tf.constant(np.random.randn(4*self.n_hidden,))
+        if weights is not None:
+            self.check_weights(weights)
+            self.W_x_fward = tf.constant(weights[0], dtype=tf.float64)
+            self.W_h_fward = tf.constant(weights[1], dtype=tf.float64)
+            self.b_fward = tf.constant(weights[2], dtype=tf.float64)
 
-        self.W_x_bward = tf.constant(np.random.randn(self.embedding_dim, 4 * self.n_hidden))
-        self.W_h_bward = tf.constant(np.random.randn(self.n_hidden, 4 * self.n_hidden))
-        self.b_bward = tf.constant(np.random.randn(4 * self.n_hidden, ))
+            self.W_x_bward = tf.constant(weights[3], dtype=tf.float64)
+            self.W_h_bward = tf.constant(weights[4], dtype=tf.float64)
+            self.b_bward = tf.constant(weights[5], dtype=tf.float64)
 
-        self.W_dense_fw = tf.constant(np.random.randn(n_hidden, n_classes))
-        self.W_dense_bw = tf.constant(np.random.randn(n_hidden, n_classes))
+            self.W_dense_fw = tf.constant(weights[6][:self.n_hidden], dtype=tf.float64)
+            self.W_dense_bw = tf.constant(weights[6][self.n_hidden:], dtype=tf.float64)
+        else:
+            self.W_x_fward = tf.constant(np.random.randn(self.embedding_dim, 4 * self.n_hidden))
+            self.W_h_fward = tf.constant(np.random.randn(self.n_hidden, 4 * self.n_hidden))
+            self.b_fward = tf.constant(np.random.randn(4*self.n_hidden,))
+
+            self.W_x_bward = tf.constant(np.random.randn(self.embedding_dim, 4 * self.n_hidden))
+            self.W_h_bward = tf.constant(np.random.randn(self.n_hidden, 4 * self.n_hidden))
+            self.b_bward = tf.constant(np.random.randn(4 * self.n_hidden, ))
+
+            self.W_dense_fw = tf.constant(np.random.randn(n_hidden, n_classes))
+            self.W_dense_bw = tf.constant(np.random.randn(n_hidden, n_classes))
 
         # the intermediate states we have to remember in order to use LRP
         self.h_fward = tf.Variable(np.zeros((self.batch_size, n_hidden)))
@@ -36,6 +50,12 @@ class LSTM_network:
         self.idx_f = slice(self.n_hidden, 2 * self.n_hidden)
         self.idx_c = slice(2 * self.n_hidden, 3 * self.n_hidden)
         self.idx_o = slice(3 * self.n_hidden, 4 * self.n_hidden)
+
+    def check_weights(self, weights):
+        assert weights[0].shape == weights[3].shape == (self.embedding_dim, 4 * self.n_hidden)
+        assert weights[1].shape == weights[4].shape == (self.n_hidden, 4 * self.n_hidden)
+        assert weights[2].shape == weights[5].shape == (4 * self.n_hidden, )
+        assert weights[6].shape == (2 * self.n_hidden, self.n_classes)
 
     # x is batch of embedding vectors (batch_size, embedding_dim)
     @tf.function
@@ -70,9 +90,9 @@ class LSTM_network:
         # we have to reshape the input since tf.scans scans the input along the first axis
         elems = tf.reshape(x, (x.shape[1], x.shape[0], x.shape[2]))
         initializer = (tf.constant(np.zeros((self.batch_size, 4 * self.n_hidden))),
-                  tf.constant(np.zeros((self.batch_size, 4 * self.n_hidden))),
-                  tf.constant(np.zeros((self.batch_size, self.n_hidden))),
-                  tf.constant(np.zeros((self.batch_size, self.n_hidden))))
+                       tf.constant(np.zeros((self.batch_size, 4 * self.n_hidden))),
+                       tf.constant(np.zeros((self.batch_size, self.n_hidden))),
+                       tf.constant(np.zeros((self.batch_size, self.n_hidden))))
         fn_fward = lambda a, x: self.one_step_fward(x)
         fn_bward = lambda a, x: self.one_step_bward(x)
         # outputs contain tesnors with (T, gates_pre, gates_post, c,h)
