@@ -87,7 +87,7 @@ class LSTM_network:
     # input is full batch (batch_size, T, embedding_dim)
     @tf.function
     def full_pass(self, x):
-        # we have to reshape the input since tf.scans scans the input along the first axis
+        # we have to reorder the input since tf.scan scans the input along the first axis
         elems = tf.transpose(x, perm=[1,0,2])
         initializer = (tf.constant(np.zeros((self.batch_size, 4 * self.n_hidden))),  # gates_pre
                        tf.constant(np.zeros((self.batch_size, 4 * self.n_hidden))),  # gates_post

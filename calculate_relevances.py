@@ -15,18 +15,27 @@ def get_dummy_model(units, embedding_dim, n_classes):
 
 
 def test_equality():
+    # just something
+    T, n_hidden, n_embedding, n_classes, batch_size = 50, 300, 200, 2, 25
     orig_model = get_dummy_model(n_hidden, n_embedding, n_classes)
-    weights = orig_model.get_weights()
-    net = LSTM_network(n_hidden, n_embedding, n_classes, batch_size, weights)
+    net = LSTM_network(n_hidden, n_embedding, n_classes, batch_size, orig_model.get_weights())
     input_keras = np.random.randn(batch_size, T, n_embedding)
     input_tf = tf.constant(input_keras)
     net.full_pass(input_tf)
     model_output = orig_model.predict(input_keras)
     net_output = net.y_hat
-    return np.allclose(net_output.numpy(), model_output, atol=1e-7)
+    res = np.allclose(net_output.numpy(), model_output, atol=1e-6)
+    if res:
+        print('Forward pass of model is correct.')
+    else:
+        diff = np.sum(np.abs(net_output.numpy()-model_output))
+        print('Error in forward pass. Total abs difference : {}'.format(diff))
 
 
-def test_time():
+def test_runtime():
+    T, n_hidden, n_embedding, n_classes, batch_size = 50, 300, 200, 2, 25
+    n_samples = 1000
+    eps = 1e-3
     net = LSTM_network(n_hidden, n_embedding, n_classes, batch_size)
     input = tf.constant(np.random.randn(n_samples, T, n_embedding))
     start = time.time()
@@ -39,14 +48,6 @@ def test_time():
 
 
 if __name__ == '__main__':
-    n_samples = 2500
-    T = 50
-    n_hidden = 300
-    n_embedding = 200
-    n_classes = 2
-    batch_size = 25
-    eps = 1e-3
     #path_to_model = '../LRPForSecurity/NetworkTraining/VulDeePecker/models/keras_model_wo_metrics_w_softmax.hdf5'
-    if test_equality():
-        print('Forward pass of model is correct.')
-    test_time()
+    test_equality()
+    test_runtime()
