@@ -101,8 +101,8 @@ class LSTM_network:
         # update cell state and h
         self.c_fward.assign(o_fward[2][-1])
         self.h_fward.assign(o_fward[3][-1])
-        self.c_bward.assign(o_fward[2][-1])
-        self.h_bward.assign(o_fward[3][-1])
+        self.c_bward.assign(o_bward[2][-1])
+        self.h_bward.assign(o_bward[3][-1])
         # final prediction scores
         y_fward = tf.matmul(self.h_fward, self.W_dense_fw)
         y_bward = tf.matmul(self.h_bward, self.W_dense_bw)
