@@ -69,7 +69,7 @@ class LSTM_network:
                             tf.tanh(gate_pre[:, self.idx_c]), tf.sigmoid(gate_pre[:, self.idx_o]),
                             ], axis=1)
         c_new = gate_post[:, self.idx_f] * c_old + gate_post[:, self.idx_i] * gate_post[:, self.idx_c]
-        h_new = gate_post[:, self.idx_o] * tf.tanh(c_old)
+        h_new = gate_post[:, self.idx_o] * tf.tanh(c_new)
         return gate_pre, gate_post, c_new, h_new
 
     # x is batch of embedding vectors (batch_size, embedding_dim)
