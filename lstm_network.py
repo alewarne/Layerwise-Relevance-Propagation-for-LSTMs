@@ -102,6 +102,7 @@ class LSTM_network:
         # update cell state and h
         self.c_fward.assign(o_fward[2][-1])
         self.h_fward.assign(o_fward[3][-1])
+        # careful, when calling tf.scan with 'reverse=True', the last computation result is stored at the first index
         self.c_bward.assign(o_bward[2][0])
         self.h_bward.assign(o_bward[3][0])
         # final prediction scores
@@ -231,7 +232,8 @@ class LSTM_network:
             if self.debug:
                 tf.print('Input relevance', tf.reduce_sum(R_g_fw, axis=1))
                 tf.print('Output relevance', tf.reduce_sum(Rx_t,axis=1)+tf.reduce_sum(Rh_fw_t, axis=1))
-            Rc_fw_t += Rh_fw_t
+            if t != 0:
+                Rc_fw_t += Rh_fw_t
             tf.print('backward')
             #backward
             Rc_bw_t = self.lrp_linear_layer(gates_post_bw[t, :, self.idx_f] * c_bw[t-1, :], eye, zeros_hidden,
@@ -251,7 +253,8 @@ class LSTM_network:
             if self.debug:
                 tf.print('Input relevance', tf.reduce_sum(R_g_bw, axis=1))
                 tf.print('Output relevance', tf.reduce_sum(Rx_rev_t,axis=1)+tf.reduce_sum(Rh_bw_t, axis=1))
-            Rc_bw_t += Rh_bw_t
+            if t != 0:
+                Rc_bw_t += Rh_bw_t
             return Rh_fw_t, Rc_fw_t, Rx_t, Rh_bw_t, Rc_bw_t, Rx_rev_t
 
         lrp_pass = tf.scan(update, elems, initializer)
