@@ -25,6 +25,7 @@ class LSTM_network:
 
             self.W_dense_fw = tf.constant(weights[6][:self.n_hidden], dtype=tf.float64)
             self.W_dense_bw = tf.constant(weights[6][self.n_hidden:], dtype=tf.float64)
+            self.b_dense = tf.constant(np.zeros(n_classes))
         else:
             self.W_x_fward = tf.constant(np.random.randn(self.embedding_dim, 4 * self.n_hidden))
             self.W_h_fward = tf.constant(np.random.randn(self.n_hidden, 4 * self.n_hidden))
@@ -189,14 +190,13 @@ class LSTM_network:
         h_bw = tf.concat([h_bw, zero_block], axis=0)
 
         # first calculate relevaces from final linear layer
-        tf.print('\nfully')
         Rh_fw_T = self.lrp_linear_layer(h_fw[self.T - 1], self.W_dense_fw, 0.5 * self.b_dense,
                                        self.y_hat, R_T, self.n_hidden, eps, bias_factor)
         Rh_bw_T = self.lrp_linear_layer(h_bw[self.T -1 ], self.W_dense_bw, 0.5 * self.b_dense,
                                        self.y_hat, R_T, self.n_hidden, eps, bias_factor)
         if self.debug:
-            tf.print('Input relevance', tf.reduce_sum(R_T, axis=1))
-            tf.print('Output relevance', tf.reduce_sum(Rh_fw_T+Rh_bw_T, axis=1))
+            tf.print('Dense: Input relevance', tf.reduce_sum(R_T, axis=1))
+            tf.print('Dense: Output relevance', tf.reduce_sum(Rh_fw_T+Rh_bw_T, axis=1))
         elems = np.arange(self.T-1, -1, -1)
         initializer = (
                        Rh_fw_T,                                                             # R_h_fw
@@ -214,15 +214,13 @@ class LSTM_network:
             # t starts with T-1 ; the values we want to update are essentially Rh, Rc and Rx
             # input_tuple is (R_h_fw_t+1, R_c_fw_t+1, R_x_fw_t+1, R_h_bw_t+1, R_h_bw_t+1, R_x_bw_t+1)
             #forward
-            tf.print('forward')
-            tf.print(t)
             Rc_fw_t = self.lrp_linear_layer(gates_post_fw[t, :, self.idx_f] * c_fw[t-1, :], eye, zeros_hidden,
                                                c_fw[t, :],  input_tuple[1], self.n_hidden, eps, bias_factor)
             R_g_fw = self.lrp_linear_layer(gates_post_fw[t,:,self.idx_i] * gates_post_fw[t,:,self.idx_c], eye,
                                         zeros_hidden, c_fw[t, :], input_tuple[1], self.n_hidden, eps, bias_factor)
             if self.debug:
-                tf.print('Input relevance', tf.reduce_sum(input_tuple[1], axis=1))
-                tf.print('Output relevance', tf.reduce_sum(Rc_fw_t + R_g_fw, axis=1))
+                tf.print('Fw1: Input relevance', tf.reduce_sum(input_tuple[1], axis=1))
+                tf.print('Fw1: Output relevance', tf.reduce_sum(Rc_fw_t + R_g_fw, axis=1))
             Rx_t = self.lrp_linear_layer(x[:,t], self.W_x_fward[:, self.idx_c], 0.5 * self.b_fward[self.idx_c],
                                          gates_pre_fw[t, :, self.idx_c], R_g_fw, self.embedding_dim,
                                          eps, bias_factor)
@@ -231,19 +229,18 @@ class LSTM_network:
                                             eps, bias_factor
                                             )
             if self.debug:
-                tf.print('Input relevance', tf.reduce_sum(R_g_fw, axis=1))
-                tf.print('Output relevance', tf.reduce_sum(Rx_t,axis=1)+tf.reduce_sum(Rh_fw_t, axis=1))
+                tf.print('Fw2: Input relevance', tf.reduce_sum(R_g_fw, axis=1))
+                tf.print('Fw2: Output relevance', tf.reduce_sum(Rx_t,axis=1)+tf.reduce_sum(Rh_fw_t, axis=1))
             if t != 0:
                 Rc_fw_t += Rh_fw_t
-            tf.print('backward')
             #backward
             Rc_bw_t = self.lrp_linear_layer(gates_post_bw[t, :, self.idx_f] * c_bw[t-1, :], eye, zeros_hidden,
                                             c_bw[t, :], input_tuple[4], self.n_hidden, eps, bias_factor)
             R_g_bw = self.lrp_linear_layer(gates_post_bw[t, :, self.idx_i] * gates_post_bw[t, :, self.idx_c], eye,
                                            zeros_hidden, c_bw[t,:], input_tuple[4], self.n_hidden, eps, bias_factor)
             if self.debug:
-                tf.print('Input relevance', tf.reduce_sum(input_tuple[4], axis=1))
-                tf.print('Output relevance', tf.reduce_sum(Rc_bw_t + R_g_bw, axis=1))
+                tf.print('Bw1: Input relevance', tf.reduce_sum(input_tuple[4], axis=1))
+                tf.print('Bw1: Output relevance', tf.reduce_sum(Rc_bw_t + R_g_bw, axis=1))
             Rx_rev_t = self.lrp_linear_layer(x_rev[:, t], self.W_x_bward[:, self.idx_c], 0.5 * self.b_bward[self.idx_c],
                                             gates_pre_bw[t, :, self.idx_c], R_g_bw, self.embedding_dim,
                                             eps, bias_factor)
@@ -252,8 +249,8 @@ class LSTM_network:
                                             eps, bias_factor
                                             )
             if self.debug:
-                tf.print('Input relevance', tf.reduce_sum(R_g_bw, axis=1))
-                tf.print('Output relevance', tf.reduce_sum(Rx_rev_t,axis=1)+tf.reduce_sum(Rh_bw_t, axis=1))
+                tf.print('Bw2: Input relevance', tf.reduce_sum(R_g_bw, axis=1))
+                tf.print('Bw2: Output relevance', tf.reduce_sum(Rx_rev_t,axis=1)+tf.reduce_sum(Rh_bw_t, axis=1))
             if t != 0:
                 Rc_bw_t += Rh_bw_t
             return Rh_fw_t, Rc_fw_t, Rx_t, Rh_bw_t, Rc_bw_t, Rx_rev_t
