@@ -36,6 +36,7 @@ class LSTM_network:
 
             self.W_dense_fw = tf.constant(np.random.randn(n_hidden, n_classes))
             self.W_dense_bw = tf.constant(np.random.randn(n_hidden, n_classes))
+            self.b_dense = tf.constant(np.random.randn(n_classes))
 
         # the intermediate states we have to remember in order to use LRP
         self.h_fward = tf.Variable(np.zeros((self.batch_size, n_hidden)))
@@ -108,7 +109,7 @@ class LSTM_network:
         # final prediction scores
         y_fward = tf.matmul(self.h_fward, self.W_dense_fw)
         y_bward = tf.matmul(self.h_bward, self.W_dense_bw)
-        self.y_hat.assign(y_fward + y_bward)
+        self.y_hat.assign(y_fward + y_bward + self.b_dense)
         return o_fward, o_bward
 
     def lrp_linear_layer(self, h_in, w, b, hout, Rout, bias_nb_units, eps, bias_factor=0.0):
@@ -133,7 +134,7 @@ class LSTM_network:
         eps_t = tf.constant(eps, dtype=tf.float64)
         sign_out = tf.cast(tf.where(hout >= 0, 1., -1.), tf.float64)   # shape (batch_size, M)
         numerator_1 = tf.expand_dims(h_in, axis=2) * w
-        numerator_2 = bias_factor_t * (tf.expand_dims(b, 0) + eps_t * sign_out) / bias_nb_units
+        numerator_2 = (bias_factor_t * tf.expand_dims(b, 0) + eps_t * sign_out) / bias_nb_units
         numerator = numerator_1 + tf.expand_dims(numerator_2, 1)
         denom = hout + (eps*sign_out)
         message = numerator / tf.expand_dims(denom, 1) * tf.expand_dims(Rout, 1)
@@ -189,10 +190,10 @@ class LSTM_network:
 
         # first calculate relevaces from final linear layer
         tf.print('\nfully')
-        Rh_fw_T = self.lrp_linear_layer(h_fw[self.T - 1], self.W_dense_fw, tf.constant(np.zeros(self.n_classes)),
-                                       self.y_hat, R_T, 2 * self.n_hidden, eps, bias_factor)
-        Rh_bw_T = self.lrp_linear_layer(h_bw[self.T -1 ], self.W_dense_bw, tf.constant(np.zeros(self.n_classes)),
-                                       self.y_hat, R_T, 2 * self.n_hidden, eps, bias_factor)
+        Rh_fw_T = self.lrp_linear_layer(h_fw[self.T - 1], self.W_dense_fw, 0.5 * self.b_dense,
+                                       self.y_hat, R_T, self.n_hidden, eps, bias_factor)
+        Rh_bw_T = self.lrp_linear_layer(h_bw[self.T -1 ], self.W_dense_bw, 0.5 * self.b_dense,
+                                       self.y_hat, R_T, self.n_hidden, eps, bias_factor)
         if self.debug:
             tf.print('Input relevance', tf.reduce_sum(R_T, axis=1))
             tf.print('Output relevance', tf.reduce_sum(Rh_fw_T+Rh_bw_T, axis=1))
@@ -216,17 +217,17 @@ class LSTM_network:
             tf.print('forward')
             tf.print(t)
             Rc_fw_t = self.lrp_linear_layer(gates_post_fw[t, :, self.idx_f] * c_fw[t-1, :], eye, zeros_hidden,
-                                               c_fw[t, :],  input_tuple[1], 2 * self.n_hidden, eps, bias_factor)
+                                               c_fw[t, :],  input_tuple[1], self.n_hidden, eps, bias_factor)
             R_g_fw = self.lrp_linear_layer(gates_post_fw[t,:,self.idx_i] * gates_post_fw[t,:,self.idx_c], eye,
-                                        zeros_hidden, c_fw[t, :], input_tuple[1], 2 * self.n_hidden, eps, bias_factor)
+                                        zeros_hidden, c_fw[t, :], input_tuple[1], self.n_hidden, eps, bias_factor)
             if self.debug:
                 tf.print('Input relevance', tf.reduce_sum(input_tuple[1], axis=1))
                 tf.print('Output relevance', tf.reduce_sum(Rc_fw_t + R_g_fw, axis=1))
             Rx_t = self.lrp_linear_layer(x[:,t], self.W_x_fward[:, self.idx_c], 0.5 * self.b_fward[self.idx_c],
-                                         gates_pre_fw[t, :, self.idx_c], R_g_fw, self.n_hidden+self.embedding_dim,
+                                         gates_pre_fw[t, :, self.idx_c], R_g_fw, self.embedding_dim,
                                          eps, bias_factor)
             Rh_fw_t = self.lrp_linear_layer(h_fw[t-1, :], self.W_h_fward[:, self.idx_c], 0.5 * self.b_fward[self.idx_c],
-                                            gates_pre_fw[t, :, self.idx_c], R_g_fw, self.n_hidden + self.embedding_dim,
+                                            gates_pre_fw[t, :, self.idx_c], R_g_fw, self.n_hidden,
                                             eps, bias_factor
                                             )
             if self.debug:
@@ -237,17 +238,17 @@ class LSTM_network:
             tf.print('backward')
             #backward
             Rc_bw_t = self.lrp_linear_layer(gates_post_bw[t, :, self.idx_f] * c_bw[t-1, :], eye, zeros_hidden,
-                                            c_bw[t, :], input_tuple[4], 2 * self.n_hidden, eps, bias_factor)
+                                            c_bw[t, :], input_tuple[4], self.n_hidden, eps, bias_factor)
             R_g_bw = self.lrp_linear_layer(gates_post_bw[t, :, self.idx_i] * gates_post_bw[t, :, self.idx_c], eye,
-                                           zeros_hidden, c_bw[t,:], input_tuple[4], 2 *self.n_hidden, eps, bias_factor)
+                                           zeros_hidden, c_bw[t,:], input_tuple[4], self.n_hidden, eps, bias_factor)
             if self.debug:
                 tf.print('Input relevance', tf.reduce_sum(input_tuple[4], axis=1))
                 tf.print('Output relevance', tf.reduce_sum(Rc_bw_t + R_g_bw, axis=1))
             Rx_rev_t = self.lrp_linear_layer(x_rev[:, t], self.W_x_bward[:, self.idx_c], 0.5 * self.b_bward[self.idx_c],
-                                            gates_pre_bw[t, :, self.idx_c], R_g_bw, self.n_hidden + self.embedding_dim,
+                                            gates_pre_bw[t, :, self.idx_c], R_g_bw, self.embedding_dim,
                                             eps, bias_factor)
             Rh_bw_t = self.lrp_linear_layer(h_bw[t-1, :], self.W_h_bward[:, self.idx_c], 0.5 * self.b_bward[self.idx_c],
-                                            gates_pre_bw[t, :, self.idx_c], R_g_bw, self.n_hidden + self.embedding_dim,
+                                            gates_pre_bw[t, :, self.idx_c], R_g_bw, self.n_hidden,
                                             eps, bias_factor
                                             )
             if self.debug:
