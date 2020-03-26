@@ -5,11 +5,12 @@ import numpy as np
 # currently 1 bi-directional lstm layer followed by a dense layer
 class LSTM_network:
 
-    def __init__(self, n_hidden, embedding_dim, n_classes, batch_size, weights=None):
+    def __init__(self, n_hidden, embedding_dim, n_classes, batch_size, weights=None, debug=False):
         self.n_hidden = n_hidden
         self.embedding_dim = embedding_dim
         self.n_classes = n_classes
         self.batch_size = batch_size
+        self.debug = debug
 
         # model parameters
         if weights is not None:
@@ -129,10 +130,9 @@ class LSTM_network:
         """
         bias_factor_t = tf.constant(bias_factor, dtype=tf.float64)
         eps_t = tf.constant(eps, dtype=tf.float64)
-        sign_out = tf.where(hout >= 0, 1., -1.)   # shape (batch_size, M)
-        sign_out = tf.cast(sign_out, tf.float64)
+        sign_out = tf.cast(tf.where(hout >= 0, 1., -1.), tf.float64)   # shape (batch_size, M)
         numerator_1 = tf.expand_dims(h_in, axis=2) * w
-        numerator_2 = (bias_factor_t * (tf.expand_dims(b, 0) + eps_t * sign_out) / bias_nb_units)
+        numerator_2 = bias_factor_t * (tf.expand_dims(b, 0) + eps_t * sign_out) / bias_nb_units
         numerator = numerator_1 + tf.expand_dims(numerator_2, 1)
         denom = hout + (eps*sign_out)
         message = numerator / tf.expand_dims(denom, 1) * tf.expand_dims(Rout, 1)
@@ -151,15 +151,13 @@ class LSTM_network:
         - Relevances:     relevances of each input dimension. dim = (batch_size, T, embedding_dim
         """
         self.T = x.shape[1]
-        self.Rx = tf.Variable(np.zeros(x.shape))
-        self.Rx_rev = tf.Variable(np.zeros(x.shape))
 
         lrp_pass = self.lrp_lstm(x,y,eps, bias_factor)
         # add forward and backward relevances of x (revert x_rev)
         Rx_ = lrp_pass[2] + tf.reverse(lrp_pass[5], axis=[0])
-        Rx = tf.reshape(Rx_, (self.batch_size, self.T, self.embedding_dim))  # put batch dimension to first dim again
-        # remaining relevance is sum of 0th entry of Rh and Rc
-        rest = tf.reduce_sum(lrp_pass[0][0] + lrp_pass[1][0] + lrp_pass[3][0] + lrp_pass[4][0], axis=1)
+        Rx = tf.transpose(Rx_, perm=(1,0,2))  # put batch dimension to first dim again
+        # remaining relevance is sum of last entry of Rh and Rc
+        rest = tf.reduce_sum(lrp_pass[0][-1] + lrp_pass[1][-1] + lrp_pass[3][-1] + lrp_pass[4][-1], axis=1)
         return Rx, rest
 
     @tf.function
@@ -177,11 +175,26 @@ class LSTM_network:
         R_T = self.y_hat * R_out_mask
         gates_pre_fw, gates_post_fw, c_fw, h_fw = output_fw
         gates_pre_bw, gates_post_bw, c_bw, h_bw = output_bw
+        # c and h have one timestep more than x (the initial one, we have to add these zeros manually)
+        zero_block = tf.constant(np.zeros((1, self.batch_size, self.n_hidden)))
+        c_fw = tf.concat([c_fw, zero_block], axis=0)
+        h_fw = tf.concat([h_fw, zero_block], axis=0)
+        gates_pre_bw = tf.reverse(gates_pre_bw, [0])
+        gates_post_bw = tf.reverse(gates_post_bw, [0])
+        c_bw = tf.reverse(c_bw, [0])
+        h_bw = tf.reverse(h_bw, [0])
+        c_bw = tf.concat([c_bw, zero_block], axis=0)
+        h_bw = tf.concat([h_bw, zero_block], axis=0)
+
         # first calculate relevaces from final linear layer
+        tf.print('\nfully')
         Rh_fw_T = self.lrp_linear_layer(h_fw[self.T - 1], self.W_dense_fw, tf.constant(np.zeros(self.n_classes)),
                                        self.y_hat, R_T, 2 * self.n_hidden, eps, bias_factor)
-        Rh_bw_T = self.lrp_linear_layer(h_bw[self.T - 1], self.W_dense_bw, tf.constant(np.zeros(self.n_classes)),
+        Rh_bw_T = self.lrp_linear_layer(h_bw[self.T -1 ], self.W_dense_bw, tf.constant(np.zeros(self.n_classes)),
                                        self.y_hat, R_T, 2 * self.n_hidden, eps, bias_factor)
+        if self.debug:
+            tf.print('Input relevance', tf.reduce_sum(R_T, axis=1))
+            tf.print('Output relevance', tf.reduce_sum(Rh_fw_T+Rh_bw_T, axis=1))
         elems = np.arange(self.T-1, -1, -1)
         initializer = (
                        Rh_fw_T,                                                             # R_h_fw
@@ -191,40 +204,54 @@ class LSTM_network:
                        Rh_bw_T,                                                             # R_c_bw
                        tf.constant(np.zeros((self.batch_size, self.embedding_dim)))         # R_x_bw
                        )
+        eye = tf.eye(self.n_hidden, dtype=tf.float64)
+        zeros_hidden = tf.constant(np.zeros((self.n_hidden)))
 
         @tf.function
         def update(input_tuple, t):
             # t starts with T-1 ; the values we want to update are essentially Rh, Rc and Rx
             # input_tuple is (R_h_fw_t+1, R_c_fw_t+1, R_x_fw_t+1, R_h_bw_t+1, R_h_bw_t+1, R_x_bw_t+1)
-            eye = tf.eye(self.n_hidden, dtype=tf.float64)
-            zeros_hidden = tf.constant(np.zeros((self.n_hidden)))
             #forward
-            Rc_fw_t = self.lrp_linear_layer(gates_post_fw[t, :, self.idx_f] * c_fw[t - 1, :], eye, zeros_hidden,
+            tf.print('forward')
+            tf.print(t)
+            Rc_fw_t = self.lrp_linear_layer(gates_post_fw[t, :, self.idx_f] * c_fw[t-1, :], eye, zeros_hidden,
                                                c_fw[t, :],  input_tuple[1], 2 * self.n_hidden, eps, bias_factor)
             R_g_fw = self.lrp_linear_layer(gates_post_fw[t,:,self.idx_i] * gates_post_fw[t,:,self.idx_c], eye,
                                         zeros_hidden, c_fw[t, :], input_tuple[1], 2 * self.n_hidden, eps, bias_factor)
-            Rx_t = self.lrp_linear_layer(x[:,t], self.W_x_fward[:, self.idx_c], self.b_fward[self.idx_c],
+            if self.debug:
+                tf.print('Input relevance', tf.reduce_sum(input_tuple[1], axis=1))
+                tf.print('Output relevance', tf.reduce_sum(Rc_fw_t + R_g_fw, axis=1))
+            Rx_t = self.lrp_linear_layer(x[:,t], self.W_x_fward[:, self.idx_c], 0.5 * self.b_fward[self.idx_c],
                                          gates_pre_fw[t, :, self.idx_c], R_g_fw, self.n_hidden+self.embedding_dim,
                                          eps, bias_factor)
-            Rh_fw_t = self.lrp_linear_layer(h_fw[t-1, :, :], self.W_h_fward[:, self.idx_c], self.b_fward[self.idx_c],
+            Rh_fw_t = self.lrp_linear_layer(h_fw[t-1, :], self.W_h_fward[:, self.idx_c], 0.5 * self.b_fward[self.idx_c],
                                             gates_pre_fw[t, :, self.idx_c], R_g_fw, self.n_hidden + self.embedding_dim,
                                             eps, bias_factor
                                             )
-            Rc_fw_t += Rh_fw_T
+            if self.debug:
+                tf.print('Input relevance', tf.reduce_sum(R_g_fw, axis=1))
+                tf.print('Output relevance', tf.reduce_sum(Rx_t,axis=1)+tf.reduce_sum(Rh_fw_t, axis=1))
+            Rc_fw_t += Rh_fw_t
+            tf.print('backward')
             #backward
-            Rc_bw_t = self.lrp_linear_layer(gates_post_bw[t, :, self.idx_f] * c_bw[t - 1, :], eye, zeros_hidden,
-                                            c_bw[t, :], input_tuple[1], 2 * self.n_hidden, eps, bias_factor)
+            Rc_bw_t = self.lrp_linear_layer(gates_post_bw[t, :, self.idx_f] * c_bw[t-1, :], eye, zeros_hidden,
+                                            c_bw[t, :], input_tuple[4], 2 * self.n_hidden, eps, bias_factor)
             R_g_bw = self.lrp_linear_layer(gates_post_bw[t, :, self.idx_i] * gates_post_bw[t, :, self.idx_c], eye,
-                                           zeros_hidden, c_bw[t, :], input_tuple[1], 2 * self.n_hidden, eps,
-                                           bias_factor)
-            Rx_rev_t = self.lrp_linear_layer(x_rev[:, t], self.W_x_bward[:, self.idx_c], self.b_bward[self.idx_c],
-                                         gates_pre_bw[t, :, self.idx_c], R_g_bw, self.n_hidden + self.embedding_dim,
-                                         eps, bias_factor)
-            Rh_bw_t = self.lrp_linear_layer(h_bw[t - 1, :, :], self.W_h_bward[:, self.idx_c], self.b_bward[self.idx_c],
+                                           zeros_hidden, c_bw[t,:], input_tuple[4], 2 *self.n_hidden, eps, bias_factor)
+            if self.debug:
+                tf.print('Input relevance', tf.reduce_sum(input_tuple[4], axis=1))
+                tf.print('Output relevance', tf.reduce_sum(Rc_bw_t + R_g_bw, axis=1))
+            Rx_rev_t = self.lrp_linear_layer(x_rev[:, t], self.W_x_bward[:, self.idx_c], 0.5 * self.b_bward[self.idx_c],
+                                            gates_pre_bw[t, :, self.idx_c], R_g_bw, self.n_hidden + self.embedding_dim,
+                                            eps, bias_factor)
+            Rh_bw_t = self.lrp_linear_layer(h_bw[t-1, :], self.W_h_bward[:, self.idx_c], 0.5 * self.b_bward[self.idx_c],
                                             gates_pre_bw[t, :, self.idx_c], R_g_bw, self.n_hidden + self.embedding_dim,
                                             eps, bias_factor
                                             )
-            Rc_bw_t += Rh_bw_T
+            if self.debug:
+                tf.print('Input relevance', tf.reduce_sum(R_g_bw, axis=1))
+                tf.print('Output relevance', tf.reduce_sum(Rx_rev_t,axis=1)+tf.reduce_sum(Rh_bw_t, axis=1))
+            Rc_bw_t += Rh_bw_t
             return Rh_fw_t, Rc_fw_t, Rx_t, Rh_bw_t, Rc_bw_t, Rx_rev_t
 
         lrp_pass = tf.scan(update, elems, initializer)

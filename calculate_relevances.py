@@ -33,14 +33,17 @@ def test_equality():
 
 
 def test_runtime():
-    T, n_hidden, n_embedding, n_classes, batch_size = 50, 300, 200, 2, 25
-    n_samples = 1000
+    T, n_hidden, n_embedding, n_classes, batch_size = 3, 300, 200, 2, 1
+    n_samples = 1
     eps = 1e-3
-    net = LSTM_network(n_hidden, n_embedding, n_classes, batch_size)
+    debug = True
+    net = LSTM_network(n_hidden, n_embedding, n_classes, batch_size, debug=debug)
     input = tf.constant(np.random.randn(n_samples, T, n_embedding))
     start = time.time()
     for i in tqdm(range(0, n_samples, batch_size)):
-        Rx, rest = net.lrp(input[i:i+batch_size], eps=eps)
+        Rx, rest = net.lrp(input[i:i+batch_size], eps=eps, bias_factor=1.0)
+        print('Relevance in:', tf.reduce_sum(tf.reduce_max(net.y_hat, axis=1)).numpy())
+        print('Relevance out:', tf.reduce_sum(Rx).numpy()+rest.numpy())
     end = time.time()
     total = end-start
     per_sample = total / n_samples
@@ -49,5 +52,5 @@ def test_runtime():
 
 if __name__ == '__main__':
     #path_to_model = '../LRPForSecurity/NetworkTraining/VulDeePecker/models/keras_model_wo_metrics_w_softmax.hdf5'
-    test_equality()
+    #test_equality()
     test_runtime()
