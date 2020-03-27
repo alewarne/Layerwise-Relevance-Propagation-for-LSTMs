@@ -33,12 +33,16 @@ def test_forwrad_pass():
 
 
 def test_lrp():
-    T, n_hidden, n_embedding, n_classes, batch_size = 5, 300, 200, 2, 10
+    T, n_hidden, n_embedding, n_classes, batch_size = 5, 300, 10, 2, 1
     eps = 0.
     bias_factor = 1.0
-    net = LSTM_network(n_hidden, n_embedding, n_classes, batch_size)
+    debug = True
+    np.random.seed(42)
+    net = LSTM_network(n_hidden, n_embedding, n_classes, batch_size, debug=debug)
     input = tf.constant(np.random.randn(batch_size, T, n_embedding))
     Rx, rest = net.lrp(input, eps=eps, bias_factor=bias_factor)
+    print(Rx.numpy().shape)
+    print(Rx.numpy())
     R_in, R_out = (tf.reduce_sum(tf.reduce_max(net.y_hat, axis=1)).numpy(),
                   tf.reduce_sum(Rx).numpy() + tf.reduce_sum(rest).numpy())
     if np.isclose(R_in, R_out):
@@ -65,6 +69,6 @@ def test_runtime():
 
 if __name__ == '__main__':
     #path_to_model = '../LRPForSecurity/NetworkTraining/VulDeePecker/models/keras_model_wo_metrics_w_softmax.hdf5'
-    test_forwrad_pass()
+    #test_forwrad_pass()
     test_lrp()
-    test_runtime()
+    #test_runtime()
