@@ -135,8 +135,9 @@ class LSTM_network:
         eps_t = tf.constant(eps, dtype=tf.float64)
         sign_out = tf.cast(tf.where(hout >= 0, 1., -1.), tf.float64)   # shape (batch_size, M)
         numerator_1 = tf.expand_dims(h_in, axis=2) * w
-        #numerator_2 = bias_factor_t * (tf.expand_dims(b, 0) + eps_t * sign_out) / bias_nb_units
-        numerator_2 =  (bias_factor_t * tf.expand_dims(b, 0) + eps_t * sign_out) / bias_nb_units
+        numerator_2 = bias_factor_t * (tf.expand_dims(b, 0) + eps_t * sign_out) / bias_nb_units
+        # use the following term if you want to check relevance property
+        #numerator_2 =  (bias_factor_t * tf.expand_dims(b, 0) + eps_t * sign_out) / bias_nb_units
         numerator = numerator_1 + tf.expand_dims(numerator_2, 1)
         denom = hout + (eps*sign_out)
         message = numerator / tf.expand_dims(denom, 1) * tf.expand_dims(Rout, 1)
