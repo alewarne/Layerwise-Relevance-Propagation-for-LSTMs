@@ -155,6 +155,7 @@ class LSTM_network:
         Returns:
         - Relevances:     relevances of each input dimension. dim = (batch_size, T, embedding_dim
         """
+        assert x.shape[0] == self.batch_size, 'This network can only explain data of shape {}'.format(self.batch_size)
         self.T = x.shape[1]
 
         lrp_pass = self.lrp_lstm(x,y,eps, bias_factor)
