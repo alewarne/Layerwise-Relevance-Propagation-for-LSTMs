@@ -36,7 +36,7 @@ def test_lrp():
     T, n_hidden, n_embedding, n_classes, batch_size = 5, 300, 10, 2, 1
     eps = 0.
     bias_factor = 1.0
-    debug = True
+    debug = False
     np.random.seed(42)
     net = LSTM_network(n_hidden, n_embedding, n_classes, batch_size, debug=debug)
     input = tf.constant(np.random.randn(batch_size, T, n_embedding))

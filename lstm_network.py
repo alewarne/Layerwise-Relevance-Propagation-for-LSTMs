@@ -159,8 +159,11 @@ class LSTM_network:
         self.T = x.shape[1]
 
         lrp_pass = self.lrp_lstm(x,y,eps, bias_factor)
-        # add forward and backward relevances of x (revert x_rev)
-        Rx_ = lrp_pass[2] + tf.reverse(lrp_pass[5], axis=[0])
+        # add forward and backward relevances of x.
+        # Here we have to reverse R_x_fw since the tf.scan() function starts at the last timestep (T-1) and moves to
+        # timestep 0. Therefore the last entry of lrp_pass[2] belongs to the first timestep of x. Likewise, the last
+        # entry of lrp_pass[5] (R_x_rev) belongs to the last timestep of x and is thus already in the right order.
+        Rx_ = tf.reverse(lrp_pass[2], axis=[0]) + lrp_pass[5]
         Rx = tf.transpose(Rx_, perm=(1,0,2))  # put batch dimension to first dim again
         # remaining relevance is sum of last entry of Rh and Rc
         rest = tf.reduce_sum(lrp_pass[0][-1] + lrp_pass[1][-1] + lrp_pass[3][-1] + lrp_pass[4][-1], axis=1)
