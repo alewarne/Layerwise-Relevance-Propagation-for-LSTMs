@@ -18,9 +18,9 @@ def test_forwrad_pass():
     # just something
     T, n_hidden, n_embedding, n_classes, batch_size, total = 50, 300, 200, 2, 20, 50
     orig_model = get_dummy_model(n_hidden, n_embedding, n_classes)
-    net = LSTM_network(n_hidden, n_embedding, n_classes, batch_size, orig_model.get_weights())
+    net = LSTM_network(n_hidden, n_embedding, n_classes, orig_model.get_weights())
     input_keras = np.random.randn(total, T, n_embedding)
-    net_output = np.vstack([net.full_pass(input_keras[i:i + batch_size])[2] for i in range(0, total, batch_size)])
+    net_output = np.vstack([net.full_pass(input_keras[i:i + batch_size])[0] for i in range(0, total, batch_size)])
     model_output = orig_model.predict(input_keras, batch_size=batch_size)
     res = np.allclose(net_output, model_output, atol=1e-6)
     np.set_printoptions(precision=5)
@@ -37,17 +37,15 @@ def test_lrp():
     bias_factor = 1.0
     debug = False
     np.random.seed(42)
-    net = LSTM_network(n_hidden, n_embedding, n_classes, batch_size, debug=debug)
+    net = LSTM_network(n_hidden, n_embedding, n_classes, debug=debug)
     input = tf.constant(np.random.randn(batch_size, T, n_embedding))
     Rx, rest = net.lrp(input, eps=eps, bias_factor=bias_factor)
-    print(Rx.numpy().shape)
-    print(Rx.numpy())
     R_in, R_out = (tf.reduce_sum(tf.reduce_max(net.y_hat, axis=1)).numpy(),
                   tf.reduce_sum(Rx).numpy() + tf.reduce_sum(rest).numpy())
     if np.isclose(R_in, R_out):
-        print('LRP pass is correct: Relevance in: {}, Relevance out: {}'.format(R_in, R_out))
+        print('LRP pass is correct: Relevance in: {0:.5f}, Relevance out: {1:.5f}'.format(R_in, R_out))
     else:
-        print('LRP pass is not correct: Relevance in: {}, Relevance out: {}'.format(R_in, R_out))
+        print('LRP pass is not correct: Relevance in: {0:.5f}, Relevance out: {1:.5f}'.format(R_in, R_out))
 
 
 def test_runtime():

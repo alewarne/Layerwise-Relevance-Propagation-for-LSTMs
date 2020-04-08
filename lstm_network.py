@@ -5,11 +5,10 @@ import numpy as np
 # currently 1 bi-directional lstm layer followed by a dense layer
 class LSTM_network:
 
-    def __init__(self, n_hidden, embedding_dim, n_classes, batch_size, weights=None, debug=False):
+    def __init__(self, n_hidden, embedding_dim, n_classes, weights=None, debug=False):
         self.n_hidden = n_hidden
         self.embedding_dim = embedding_dim
         self.n_classes = n_classes
-        self.batch_size = batch_size
         self.debug = debug
 
         # model parameters
@@ -39,15 +38,8 @@ class LSTM_network:
             self.W_dense_bw = tf.constant(np.random.randn(n_hidden, n_classes))
             self.b_dense = tf.constant(np.random.randn(n_classes))
 
-        # the intermediate states we have to remember in order to use LRP
-        # since batch size is not known in advance we specify no shape. actual shape will be (batch_size, n_hidden)
-        self.h_fward = tf.Variable(0., shape=tf.TensorShape(None), dtype=tf.float64, name='h_fward')
-        self.c_fward = tf.Variable(0., shape=tf.TensorShape(None), dtype=tf.float64, name='c_fward')
-        self.h_bward = tf.Variable(0., shape=tf.TensorShape(None), dtype=tf.float64, name='h_bward')
-        self.c_bward = tf.Variable(0., shape=tf.TensorShape(None), dtype=tf.float64, name='c_bward')
-
         # prediction of the net
-        #self.y_hat = tf.Variable(0., shape=tf.TensorShape(None), dtype=tf.float64, name='y_hat')
+        self.y_hat = tf.Variable(0., shape=tf.TensorShape(None), dtype=tf.float64, name='y_hat')
 
         # the following order is from keras. You might have to adjust it if you use different frameworks
         self.idx_i = slice(0, self.n_hidden)
@@ -103,17 +95,12 @@ class LSTM_network:
         # outputs contain tesnors with (T, gates_pre, gates_post, c,h)
         o_fward = tf.scan(fn_fward, elems, initializer=initializer)
         o_bward = tf.scan(fn_bward, elems, initializer=initializer, reverse=True)
-        # update cell state and h
-        self.c_fward.assign(o_fward[2][-1])
-        self.h_fward.assign(o_fward[3][-1])
-        # careful, when calling tf.scan with 'reverse=True', the last computation result is stored at the first index
-        self.c_bward.assign(o_bward[2][0])
-        self.h_bward.assign(o_bward[3][0])
         # final prediction scores
-        y_fward = tf.matmul(self.h_fward, self.W_dense_fw)
-        y_bward = tf.matmul(self.h_bward, self.W_dense_bw)
+        y_fward = tf.matmul(o_fward[3][-1], self.W_dense_fw)
+        y_bward = tf.matmul(o_bward[3][0], self.W_dense_bw)
         y_hat = y_fward + y_bward + self.b_dense
-        return o_fward, o_bward, y_hat
+        self.y_hat.assign(y_hat)
+        return y_hat, o_fward, o_bward
 
     def lrp_linear_layer(self, h_in, w, b, hout, Rout, bias_nb_units, eps, bias_factor=0.0):
         """
@@ -157,8 +144,6 @@ class LSTM_network:
         Returns:
         - Relevances:     relevances of each input dimension. dim = (batch_size, T, embedding_dim
         """
-        self.T = x.shape[1]
-
         lrp_pass = self.lrp_lstm(x,y,eps, bias_factor)
         # add forward and backward relevances of x.
         # Here we have to reverse R_x_fw since the tf.scan() function starts at the last timestep (T-1) and moves to
@@ -173,11 +158,10 @@ class LSTM_network:
     @tf.function
     def lrp_lstm(self, x, y=None, eps=1e-3, bias_factor=0.0):
         batch_size = x.shape[0]
+        T = x.shape[1]
         x_rev = tf.reverse(x, axis=[1])
         # update inner states
-        output_fw, output_bw, y_hat = self.full_pass(x)
-        print('yhat', y_hat.shape)
-        print(self.h_fward.shape)
+        y_hat, output_fw, output_bw = self.full_pass(x)
         # if classes are given, use them. Else choose prediction of the network
         if y is not None:
             if not y.dtype is tf.int64:
@@ -200,16 +184,14 @@ class LSTM_network:
         h_bw = tf.concat([h_bw, zero_block], axis=0)
 
         # first calculate relevaces from final linear layer
-        Rh_fw_T = self.lrp_linear_layer(h_fw[self.T - 1], self.W_dense_fw, self.b_dense,
+        Rh_fw_T = self.lrp_linear_layer(h_fw[T - 1], self.W_dense_fw, self.b_dense,
                                        y_hat, R_T, 2*self.n_hidden, eps, bias_factor)
-        print(Rh_fw_T.shape)
-        Rh_bw_T = self.lrp_linear_layer(h_bw[self.T - 1], self.W_dense_bw, self.b_dense,
+        Rh_bw_T = self.lrp_linear_layer(h_bw[T - 1], self.W_dense_bw, self.b_dense,
                                        y_hat, R_T, 2*self.n_hidden, eps, bias_factor)
-        print(Rh_bw_T.shape)
         if self.debug:
             tf.print('Dense: Input relevance', tf.reduce_sum(R_T, axis=1))
             tf.print('Dense: Output relevance', tf.reduce_sum(Rh_fw_T+Rh_bw_T, axis=1))
-        elems = np.arange(self.T-1, -1, -1)
+        elems = np.arange(T-1, -1, -1)
         initializer = (
                        Rh_fw_T,                                                                     # R_h_fw
                        Rh_fw_T,                                                                     # R_c_fw
@@ -235,7 +217,6 @@ class LSTM_network:
                 tf.print('Fw1: Output relevance', tf.reduce_sum(Rc_fw_t + R_g_fw, axis=1))
             Rx_t = self.lrp_linear_layer(x[:,t], self.W_x_fward[:, self.idx_c], self.b_fward[self.idx_c],
                                          gates_pre_fw[t, :, self.idx_c], R_g_fw, self.n_hidden + self.embedding_dim, eps, bias_factor)
-            tf.print(Rx_t.shape)
             Rh_fw_t = self.lrp_linear_layer(h_fw[t-1, :], self.W_h_fward[:, self.idx_c], self.b_fward[self.idx_c],
                                             gates_pre_fw[t, :, self.idx_c], R_g_fw, self.n_hidden + self.embedding_dim, eps, bias_factor
                                             )
