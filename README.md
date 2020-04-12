@@ -38,7 +38,7 @@ The ordering of the list for the weights parameter is of great importance. The p
 * Third quarter: Cell Gate
 * Fourth quarter: Output Gate
 
-Thus, if you have a keras model you don't have to adjust the ordering. Else, you should check which ordering your model has and can either use [this](model_transformer.py) script to permute them or change lines 45-48 in the [class](lstm_network.py) to adjust the underlying implementation.
+Thus, if you have a keras model you don't have to adjust the ordering. Else, you should check which ordering your model has and can either use [this](model/model_transformer.py) script to permute them or change lines 45-48 in the [class](lstm_network.py) to adjust the underlying implementation.
 
 A Bi-directional LSTM network has another set of parameters (W_x_backward, W_h_backward, b_backward) which have the same dimensions as above but process the input from the last to the first token. To this end, the weights parameter must be a list of in the order (W_x, W_h, b, W_x_backward, W_h_backward, b_backward, W_dense, b_dense) where W_dense and b_dense are the weights and bias of the final fully connected layer. You can then create your LRP model with
 
