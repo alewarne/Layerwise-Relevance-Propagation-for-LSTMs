@@ -18,7 +18,7 @@ if __name__ == "__main__":
                                                         'and third quarter of the weights.')
     args = parser.parse_args()
     weights_old = pkl.load(open(args.weight_path, 'rb'))
-    # last entry is final weight matrix which does not have to be permuted
-    weights_new = [permute(w, args.order) for w in weights_old[:-1]]
-    weights_new.append(weights_old[-1])
+    # last two entries are final weight matrix and bias which do not have to be permuted
+    weights_new = [permute(w, args.order) for w in weights_old[:-2]]
+    weights_new += weights_old[-2:]
     pkl.dump(weights_new, open('weights_permuted.pkl', 'wb'))
