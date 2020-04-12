@@ -1,6 +1,8 @@
 # Layerwise Relevance Propagation for LSTMs
 
-This repository contains an implementation of the Layerwise-Relevance-Propagation (LRP) algorithm for Long-Short-Term-Memory (LSTM) neural networks in tensorflow 2.1.
+This repository contains an implementation of the Layerwise-Relevance-Propagation (LRP) algorithm for Long-Short-Term-Memory (LSTM) neural networks in tensorflow 2.1. The code was used in the paper
+
+[Evaluating Explanation Methods for Deep Learning in Security](https://www.sec.cs.tu-bs.de/pubs/2019-explain.pdf) where we compared various explanation techniques for different models in terms of metrics like descriptive accuracy, descriptive sparsity and run-time.
 
 ## What is LRP?
 
@@ -38,7 +40,7 @@ The ordering of the list for the weights parameter is of great importance. The p
 * Third quarter: Cell Gate
 * Fourth quarter: Output Gate
 
-Thus, if you have a keras model you don't have to adjust the ordering. Else, you should check which ordering your model has and can either use [this](model/model_transformer.py) script to permute them or change lines 45-48 in the [class](lstm_network.py) to adjust the underlying implementation.
+Thus, if you have a keras model you don't have to adjust the ordering. Else, you should check which ordering your model has and can either use [this](model/model_transformer.py) script to permute them or change [these lines](https://github.com/alewarne/LRP_for_LSTMs/blob/72c19eb6e0462e970211b1f4414366f89175344e/lstm_network.py#L45-L48) to adjust the underlying implementation.
 
 A Bi-directional LSTM network has another set of parameters (W_x_backward, W_h_backward, b_backward) which have the same dimensions as above but process the input from the last to the first token. To this end, the weights parameter must be a list of in the order (W_x, W_h, b, W_x_backward, W_h_backward, b_backward, W_dense, b_dense) where W_dense and b_dense are the weights and bias of the final fully connected layer. You can then create your LRP model with
 
@@ -55,7 +57,15 @@ Example usage is documented in an [jupyter-notebook](example.ipynb)
 
 ## Contributing
 
-Feel free to contribute to this repository. There is a [test](lrp_tests.py) file that contains test for both, the forward and backward pass, to be sure that both work correctly.
+Feel free to contribute to this repository. There is a [test](lrp_tests.py) file that contains tests for both, the forward and backward pass, to be sure that both work correctly.
+
+## Citation
+
+If you find this repository helpful please cite:
+
+```
+blub
+```
 
 ## Authors
 
