@@ -24,7 +24,7 @@ class LSTM_network:
 
             self.W_dense_fw = tf.constant(weights[6][:self.n_hidden], dtype=tf.float64)
             self.W_dense_bw = tf.constant(weights[6][self.n_hidden:], dtype=tf.float64)
-            self.b_dense = tf.constant(np.zeros(n_classes))
+            self.b_dense = tf.constant(weights[7], dtype=tf.float64)
         else:
             self.W_x_fward = tf.constant(np.random.randn(self.embedding_dim, 4 * self.n_hidden))
             self.W_h_fward = tf.constant(np.random.randn(self.n_hidden, 4 * self.n_hidden))
@@ -48,10 +48,12 @@ class LSTM_network:
         self.idx_o = slice(3 * self.n_hidden, 4 * self.n_hidden)
 
     def check_weights(self, weights):
+        assert len(weights) == 8
         assert weights[0].shape == weights[3].shape == (self.embedding_dim, 4 * self.n_hidden)
         assert weights[1].shape == weights[4].shape == (self.n_hidden, 4 * self.n_hidden)
         assert weights[2].shape == weights[5].shape == (4 * self.n_hidden, )
         assert weights[6].shape == (2 * self.n_hidden, self.n_classes)
+        assert weights[7].shape == (self.n_classes,)
 
     # x is batch of embedding vectors (batch_size, embedding_dim)
     @tf.function
