@@ -85,6 +85,7 @@ class LSTM_network:
     # input is full batch (batch_size, T, embedding_dim)
     @tf.function(experimental_relax_shapes=True)
     def full_pass(self, x):
+        assert len(x.shape) == 3, '3 dimensional input required, got input of len {}'.format(len(x.shape))
         batch_size = x.shape[0]
         # we have to reorder the input since tf.scan scans the input along the first axis
         elems = tf.transpose(x, perm=[1,0,2])
@@ -146,6 +147,7 @@ class LSTM_network:
         Returns:
         - Relevances:     relevances of each input dimension. dim = (batch_size, T, embedding_dim
         """
+        assert len(x.shape) == 3, '3 dimensional input required, got input of len {}'.format(len(x.shape))
         lrp_pass = self.lrp_lstm(x,y,eps, bias_factor)
         # add forward and backward relevances of x.
         # Here we have to reverse R_x_fw since the tf.scan() function starts at the last timestep (T-1) and moves to
