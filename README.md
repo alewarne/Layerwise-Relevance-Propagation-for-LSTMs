@@ -53,7 +53,7 @@ There will be a check whether the weight parameters have the correct dimensions 
 
 ### Example
 
-Example usage is documented in an [jupyter-notebook](example.ipynb)
+Example usage is documented in a [jupyter-notebook](example.ipynb)
 
 ## Contributing
 
@@ -64,7 +64,12 @@ Feel free to contribute to this repository. There is a [test](lrp_tests.py) file
 If you find this repository helpful please cite:
 
 ```
-blub
+@inproceedings{
+author={A. {Warnecke} and D. {Arp} and C. {Wressnegger} and K. {Rieck}},
+booktitle={2020 IEEE European Symposium on Security and Privacy (EuroS&P)},
+title={Evaluating Explanation Methods for Deep Learning in Security},
+year={2020}
+} 
 ```
 
 ## Authors
