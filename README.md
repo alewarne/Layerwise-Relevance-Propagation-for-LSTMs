@@ -14,7 +14,7 @@ While the LRP algorithm has been proposed for classical feed-forward networks, L
 
 ### Why not using the original implementation?
 
-Since this implementation is in tensorflow 2.1 it comes with automatic GPU compatability and also enables batch-processsing of examples. This means, multiple input samples can be processed at once (and on a GPU) wihch results in large performance speedups which is especially handy when a lot of explanations have to be generated.
+Since this implementation is in tensorflow 2.1 it comes with automatic GPU compatability and also enables batch-processsing of examples. This means, multiple input samples can be processed at once (and on a GPU) wihch results in large performance speedups and is especially handy when a lot of explanations have to be generated.
 
 ## Ok, what can I use it for?
 
