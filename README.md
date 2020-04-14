@@ -2,7 +2,7 @@
 
 This repository contains an implementation of the Layerwise-Relevance-Propagation (LRP) algorithm for Long-Short-Term-Memory (LSTM) neural networks in tensorflow 2.1. The code was used in the paper
 
-[_Evaluating Explanation Methods for Deep Learning in Security_](https://www.sec.cs.tu-bs.de/pubs/2019-explain.pdf), _A.Warnecke, D. Arp, C. Wressnegger, K. Rieck. IEEE European Symposium on Security and Privacy, 2020._ where we compared various explanation techniques for different models and problems in the area of computer security.
+[_Evaluating Explanation Methods for Deep Learning in Security_](https://www.sec.cs.tu-bs.de/pubs/2019-explain.pdf), _A.Warnecke, D. Arp, C. Wressnegger, K. Rieck. IEEE European Symposium on Security and Privacy, 2020._ In this paper we compared various explanation techniques for different models and problems in the area of computer security.
 
 ## What is LRP?
 
