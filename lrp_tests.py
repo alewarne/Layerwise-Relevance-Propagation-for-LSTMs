@@ -53,7 +53,7 @@ def test_runtime():
     n_samples = 2500
     eps = 1e-3
     bias_factor = 0.
-    net = LSTM_network(n_hidden, n_embedding, n_classes, batch_size)
+    net = LSTM_network(n_hidden, n_embedding, n_classes)
     input = tf.constant(np.random.randn(n_samples, T, n_embedding))
     start = time.time()
     for i in tqdm(range(0, n_samples, batch_size)):
@@ -66,6 +66,6 @@ def test_runtime():
 
 if __name__ == '__main__':
     #path_to_model = '../LRPForSecurity/NetworkTraining/VulDeePecker/models/keras_model_wo_metrics_w_softmax.hdf5'
-    test_forwrad_pass()
-    test_lrp()
-    #test_runtime()
+    #test_forwrad_pass()
+    #test_lrp()
+    test_runtime()
