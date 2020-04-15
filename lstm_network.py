@@ -168,6 +168,7 @@ class LSTM_network:
         y_hat, output_fw, output_bw = self.full_pass(x)
         # if classes are given, use them. Else choose prediction of the network
         if y is not None:
+            assert y.shape == (batch_size, )
             if not y.dtype is tf.int64:
                 y = tf.cast(y, tf.int64)
             R_out_mask = tf.one_hot(y, depth=self.n_classes, dtype=tf.float64)
