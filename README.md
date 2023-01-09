@@ -33,7 +33,7 @@ To use LRP you need to provide four parameters to the constructor
 * n_classes: The output dimension of the network
 * weights: A list of numpy arrays corresponding to the parameters of the network.
 
-The ordering of the list for the weights parameter is of great importance. The parameters of an LSTM layer include two matrices W_x and W_h which have the shapes (embedding_dim, 4\*n_hidden) and (n_hidden, 4\* n_hidden) respectively and a bias b of shape (n_hidden,). See [here](https://colah.github.io/posts/2015-08-Understanding-LSTMs/) for a detailed description of these parameters. The quarters of the second dimension of W_x and W_h corresponds to the gates and thus their ordering is important aswell. The natural ordering used in this repository is given by the keras way of arranging them and is given by
+The ordering of the list for the weights parameter is of great importance. The parameters of an LSTM layer include two matrices W_x and W_h which have the shapes (embedding_dim, 4\*n_hidden) and (n_hidden, 4\* n_hidden) respectively and a bias b of shape (4\*n_hidden,). See [here](https://colah.github.io/posts/2015-08-Understanding-LSTMs/) for a detailed description of these parameters. The quarters of the second dimension of W_x and W_h corresponds to the gates and thus their ordering is important aswell. The natural ordering used in this repository is given by the keras way of arranging them and is given by
 
 * First quarter: Input Gate
 * Second quarter: Forget Gate
